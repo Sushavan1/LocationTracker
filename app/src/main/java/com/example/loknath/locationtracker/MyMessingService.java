@@ -5,6 +5,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.graphics.Color;
+import android.os.Bundle;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationManagerCompat;
 import android.util.Log;
@@ -40,10 +41,11 @@ public class MyMessingService extends FirebaseMessagingService {
         Log.e("mRequestkey", mRequestkey);
 
         Intent broadcustIntent = new Intent(this,NotificationReciver.class);
-        broadcustIntent.putExtra("toastMessage",ActiveUser.message);
-        broadcustIntent.putExtra("isAccept",true);
-        broadcustIntent.putExtra("mRequestkey",mRequestkey);
-
+        Bundle bundle=new Bundle();
+        bundle.putString("toastMessage",ActiveUser.message);
+        bundle.putBoolean("isAccept",true);
+        bundle.putString("mRequestkey",mRequestkey);
+        broadcustIntent.putExtras(bundle);
         PendingIntent acceptIntent = PendingIntent.getBroadcast(this,0,broadcustIntent,PendingIntent.FLAG_UPDATE_CURRENT);
 
         Intent broadcustIntent2 = new Intent(this,NotificationReciver.class);
