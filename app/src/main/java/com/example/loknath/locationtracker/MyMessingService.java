@@ -40,7 +40,7 @@ public class MyMessingService extends FirebaseMessagingService {
 
         Log.e("mRequestkey", mRequestkey);
 
-        Intent broadcustIntent = new Intent(this,NotificationReciver.class);
+        Intent broadcustIntent = new Intent("my.action.string");
         Bundle bundle=new Bundle();
         bundle.putString("toastMessage",ActiveUser.message);
         bundle.putBoolean("isAccept",true);

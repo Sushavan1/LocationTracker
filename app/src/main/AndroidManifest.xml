@@ -54,7 +54,12 @@
             </intent-filter>
         </service>
 
-        <receiver android:name=".NotificationReciver" />
+        <receiver android:name=".NotificationReciver" >
+            <intent-filter>
+        <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+        <action android:name="my.action.string" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
