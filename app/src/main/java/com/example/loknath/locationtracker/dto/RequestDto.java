@@ -5,6 +5,7 @@ import java.io.Serializable;
 public class RequestDto implements Serializable {
     public String receiver;
     public String sender;
+    public boolean isAccepted;
 
     @Override
     public String toString() {

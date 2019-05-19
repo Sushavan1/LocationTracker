@@ -20,6 +20,7 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
 import org.json.JSONArray;
@@ -63,7 +64,8 @@ public class ActiveUser extends AppCompatActivity {
         mRequest = FirebaseDatabase.getInstance().getReference().child("Request");
 
 
-        mfirebase.addValueEventListener(new ValueEventListener() {
+        Query query =  mfirebase.orderByChild("status").equalTo(true);
+        query.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 myArrayList = new ArrayList<UserDto>();
@@ -73,7 +75,7 @@ public class ActiveUser extends AppCompatActivity {
                     UserDto userDto;//=new UserDto();
                     userDto = dataSnapshot1.getValue(UserDto.class);
                     userDto.key = dataSnapshot1.getKey().toString();
-                    if (!authID.equals(userDto.key) && userDto.status)
+                    if (!authID.equals(userDto.key))
                         myArrayList.add(userDto);
 
                 }

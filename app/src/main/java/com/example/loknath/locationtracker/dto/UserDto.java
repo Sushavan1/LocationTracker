@@ -7,6 +7,7 @@ public class UserDto implements Serializable {
     public String key;
     public boolean status;
     public String token;
+    public LocationDto location;
 
 
     @Override

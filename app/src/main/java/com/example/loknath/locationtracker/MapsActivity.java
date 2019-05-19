@@ -1,5 +1,7 @@
 package com.example.loknath.locationtracker;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -13,6 +15,9 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.example.loknath.locationtracker.adaper.UserAdaper;
+import com.example.loknath.locationtracker.dto.RequestDto;
+import com.example.loknath.locationtracker.dto.UserDto;
 import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
 import com.firebase.geofire.GeoQuery;
@@ -33,14 +38,22 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONArray;
+
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
@@ -54,20 +67,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private GoogleApiClient mgoogleApiClient;
     private Location mLastLocation;
     private LocationRequest mLocationRequest;
-    private FusedLocationProviderClient mFusedLocationClient;
-    private DatabaseReference reference;
-    DatabaseReference userReference;
+    private DatabaseReference userReferenceStatus,userTableReference;
+    private DatabaseReference requestTable;
     //current user location
-    private Marker currentLocationMarker;
-
+    private Marker currentLocationMarker,fndLocationMarker;
     private Button mlogout,muserList;
-
-    private  LatLng pickupLocation;
     private SupportMapFragment mapFragment;
-
-    Marker mDriverMarker;
-    DatabaseReference driverLocationRef;
-    ValueEventListener driverLocationRefListener;
 
     String userId;
 
@@ -96,9 +101,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         Log.e(MapsActivity.class.getName(),userId);
-        userReference = FirebaseDatabase.getInstance().getReference().child("User").child(userId).child("status");
-        userReference.setValue(true);
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        userTableReference = FirebaseDatabase.getInstance().getReference().child("User");
+        userReferenceStatus = FirebaseDatabase.getInstance().getReference().child("User").child(userId).child("status");
+        requestTable= FirebaseDatabase.getInstance().getReference().child("Request");
+        userReferenceStatus.setValue(true);
 
 
         if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -106,9 +112,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }else{
          //   mapFragment.getMapAsync(this);
         }
-
-        reference = FirebaseDatabase.getInstance().getReference("UsersLocation");
-
 
         initView();
     }
@@ -144,101 +147,93 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
+        getFndLocation();
+
     }
 
-    //find friends
-    private int radius = 100;
+    private void getFndLocation() {
+        Query queryAsSender =  requestTable.orderByChild("sender").equalTo(userId);
 
-    private void getClosestFriends(){
-        //Find Available Friends
-        DatabaseReference friendLocation = FirebaseDatabase.getInstance().getReference().child("UsersLocation");
-        GeoFire geoFire = new GeoFire(friendLocation);
-        pickupLocation = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
-
-        GeoQuery geoQuery = geoFire.queryAtLocation(new GeoLocation(pickupLocation.latitude,pickupLocation.longitude),radius);
-        geoQuery.removeAllListeners();
-
-        geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
-            @Override
-            public void onKeyEntered(String key, GeoLocation location) {
-                System.out.println("key....>> "+key);
-               /* if (!friendFound) {
-                    friendFound = true;
-                    friendFoundId = key;
-                    System.out.println("friendFoundId....>> "+friendFoundId);
-                }*/
-               getFndLocation(key);
-
-            }
-
-            @Override
-            public void onKeyExited(String key) {
-
-            }
-
-            @Override
-            public void onKeyMoved(String key, GeoLocation location) {
-
-            }
-
-            @Override
-            public void onGeoQueryReady() {
-               /* if (!friendFound){
-                    radius++;
-                    System.out.println("radius =>" + radius);
-                    getClosestFriends();
-                }*/
-            }
-
-            @Override
-            public void onGeoQueryError(DatabaseError error) {
-
-            }
-        });
-    }
-
-
-    //All activated users in Firebase
-    private void getFndLocation(String key){
-        driverLocationRef = reference.child(key);
-        driverLocationRefListener = driverLocationRef.addValueEventListener(new ValueEventListener() {
+        queryAsSender.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                if(dataSnapshot.exists()){
-                    List<Object> map = (List<Object>) dataSnapshot.getValue();
-                    double locationLat = 0;
-                    double locationLng = 0;
-                    if(map.get(0) != null){
-                        locationLat = Double.parseDouble(map.get(0).toString());
-                    }
-                    if(map.get(1) != null){
-                        locationLng = Double.parseDouble(map.get(1).toString());
-                    }
-                    LatLng driverLatLng = new LatLng(locationLat,locationLng);
-                    if(mDriverMarker != null){
-                        mDriverMarker.remove();
-                    }
-                    Location loc1 = new Location("");
-                    loc1.setLatitude(pickupLocation.latitude);
-                    loc1.setLongitude(pickupLocation.longitude);
-
-                    Location loc2 = new Location("");
-                    loc2.setLatitude(driverLatLng.latitude);
-                    loc2.setLongitude(driverLatLng.longitude);
-
-                    float distance = loc1.distanceTo(loc2);
-
-                    mDriverMarker = mMap.addMarker(new MarkerOptions().position(driverLatLng).title("your driver"));
+                if(fndLocationMarker!=null)
+                {
+                    fndLocationMarker.remove();
                 }
+                ArrayList<RequestDto> myArrayList = new ArrayList<RequestDto>();
+                for (DataSnapshot dataSnapshot1 : dataSnapshot.getChildren()) {
+                    RequestDto requestDto;//=new UserDto();
+                    requestDto = dataSnapshot1.getValue(RequestDto.class);
+
+                    /*UserDto userDto;//=new UserDto();
+                    userDto = dataSnapshot1.getValue(UserDto.class);
+                    userDto.key = dataSnapshot1.getKey().toString();*/
+                    if (requestDto.isAccepted)
+                    {
+
+                        userTableReference.child(requestDto.receiver).addValueEventListener(new ValueEventListener() {
+                            @Override
+                            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+
+                                    UserDto userDto;//=new UserDto();
+                                    userDto = dataSnapshot.getValue(UserDto.class);
+
+
+
+                                LatLng latLng = new LatLng(userDto.location.lat,userDto.location.lan);
+
+                                MarkerOptions markerOptions = new MarkerOptions();
+                                markerOptions.position(latLng);
+                                markerOptions.title("Friend Location" + mLastLocation);
+                                markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ROSE));
+                                fndLocationMarker = mMap.addMarker(markerOptions);
+                            }
+
+                            @Override
+                            public void onCancelled(@NonNull DatabaseError databaseError) {
+
+                            }
+                        });
+
+                        userTableReference.child(userId).addValueEventListener(new ValueEventListener() {
+                            @Override
+                            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+
+                                UserDto userDto;//=new UserDto();
+                                userDto = dataSnapshot.getValue(UserDto.class);
+
+
+
+                                LatLng latLng = new LatLng(userDto.location.lat,userDto.location.lan);
+                                mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+                                MarkerOptions markerOptions = new MarkerOptions();
+                                markerOptions.position(latLng);
+                                markerOptions.title("My Location" + mLastLocation);
+                                markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
+                                fndLocationMarker = mMap.addMarker(markerOptions);
+                            }
+
+                            @Override
+                            public void onCancelled(@NonNull DatabaseError databaseError) {
+
+                            }
+                        });
+
+                    }
+
+                }
+
 
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
+
             }
         });
-
     }
+
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
@@ -268,7 +263,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (currentLocationMarker!=null){
             currentLocationMarker.remove();
         }
-
+/*
         LatLng latLng = new LatLng(location.getLatitude(),location.getLongitude());
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
       //  mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
@@ -277,19 +272,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         markerOptions.position(latLng);
         markerOptions.title("Current Location" + mLastLocation);
         markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
-        currentLocationMarker = mMap.addMarker(markerOptions);
+        currentLocationMarker = mMap.addMarker(markerOptions);*/
 
-        if(FirebaseAuth.getInstance().getCurrentUser()!=null) {
-            String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-            DatabaseReference reference = FirebaseDatabase.getInstance().getReference("UsersLocation");
-
-            GeoFire geoFire = new GeoFire(reference);
+        if(userId!=null) {
+            FirebaseDatabase.getInstance().getReference().child("User").child(userId).child("location").child("lat").setValue(location.getLatitude());
+            FirebaseDatabase.getInstance().getReference().child("User").child(userId).child("location").child("lan").setValue(location.getLongitude());
+           /* GeoFire geoFire = new GeoFire(reference);
             geoFire.setLocation(userId, new GeoLocation(location.getLatitude(), location.getLongitude()), new GeoFire.CompletionListener() {
                 @Override
                 public void onComplete(String key, DatabaseError error) {
                     Log.i("GeoFire", key);
                 }
-            });
+            });*/
         }else
         {
             System.out.println("--------onLocationChanged is calling after finish activity");
@@ -328,7 +322,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     protected void onDestroy() {
         LocationServices.FusedLocationApi.removeLocationUpdates(mgoogleApiClient, this);
         mgoogleApiClient.disconnect();
-        userReference.setValue(false);
+        userReferenceStatus.setValue(false);
         super.onDestroy();
     }
 }
