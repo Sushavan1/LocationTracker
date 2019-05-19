@@ -171,6 +171,7 @@ public class ActiveUser extends AppCompatActivity {
                     data.put("uid", FirebaseAuth.getInstance().getCurrentUser().getUid());
                     data.put("message", message);
                     data.put("mRequestkey", mRequestkey);
+                    data.put("isSender", false);
 
                     root.put("notification", notification);
                     root.put("data", data);

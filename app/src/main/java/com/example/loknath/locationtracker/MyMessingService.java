@@ -29,31 +29,57 @@ public class MyMessingService extends FirebaseMessagingService {
             Map<String, String> params = remoteMessage.getData();
             JSONObject object = new JSONObject(params);
             Log.e("JSON OBJECT", object.getString("mRequestkey"));
-            showNotification(remoteMessage.getNotification().getTitle(), remoteMessage.getNotification().getBody(),object.getString("mRequestkey"));
+            if(object.getBoolean("isSender"))
+            {
+                showNotificationforSender(remoteMessage.getNotification().getTitle(), remoteMessage.getNotification().getBody(), object.getString("mRequestkey"));
+            }else {
+                showNotification(remoteMessage.getNotification().getTitle(), remoteMessage.getNotification().getBody(), object.getString("mRequestkey"));
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
 
     }
 
+    public void showNotificationforSender(String title, String message, String mRequestkey){
+
+        Log.e("mRequestkey", mRequestkey);
+
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "MyNotification")
+                .setContentTitle(title)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setAutoCancel(true)
+                .setContentText(message)
+                .setPriority(NotificationManager.IMPORTANCE_HIGH)
+                .setColor(Color.BLUE)
+                //.setContentIntent(contentIntent)
+                .setOnlyAlertOnce(true)
+                .setStyle( new NotificationCompat.BigTextStyle().bigText(message))
+                .setDefaults(Notification.DEFAULT_ALL);
+
+        NotificationManagerCompat manager = NotificationManagerCompat.from(this);
+        manager.notify(111,builder.build());
+    }
+
+
     public void showNotification(String title, String message, String mRequestkey){
 
         Log.e("mRequestkey", mRequestkey);
 
-        Intent broadcustIntent = new Intent("my.action.string");
-        Bundle bundle=new Bundle();
-        bundle.putString("toastMessage",ActiveUser.message);
-        bundle.putBoolean("isAccept",true);
-        bundle.putString("mRequestkey",mRequestkey);
-        broadcustIntent.putExtras(bundle);
-        PendingIntent acceptIntent = PendingIntent.getBroadcast(this,0,broadcustIntent,PendingIntent.FLAG_UPDATE_CURRENT);
+        Intent acceptbroadcustIntent = new Intent(this,NotificationReciver.class);
+        acceptbroadcustIntent.putExtra("toastMessage",ActiveUser.message);
+        acceptbroadcustIntent.putExtra("isAccepted","Accept");
+        acceptbroadcustIntent.putExtra("mRequestkey",mRequestkey);
 
-        Intent broadcustIntent2 = new Intent(this,NotificationReciver.class);
-        broadcustIntent2.putExtra("toastMessage",ActiveUser.message);
-        broadcustIntent2.putExtra("isAccept",false);
-        broadcustIntent2.putExtra("mRequestkey",mRequestkey);
+       PendingIntent acceptIntent = PendingIntent.getBroadcast(this,0,acceptbroadcustIntent,PendingIntent.FLAG_UPDATE_CURRENT);
 
-        PendingIntent rejectIntent = PendingIntent.getBroadcast(this,0,broadcustIntent2,PendingIntent.FLAG_UPDATE_CURRENT);
+        Intent rejectbroadcustIntent = new Intent(this,NotificationReciver.class);
+        rejectbroadcustIntent.putExtra("toastMessage",ActiveUser.message);
+        rejectbroadcustIntent.putExtra("isAccepted","Denied");
+        rejectbroadcustIntent.putExtra("mRequestkey",mRequestkey);
+
+        PendingIntent rejectIntent = PendingIntent.getBroadcast(this,1,rejectbroadcustIntent,PendingIntent.FLAG_UPDATE_CURRENT);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "MyNotification")
                 .setContentTitle(title)

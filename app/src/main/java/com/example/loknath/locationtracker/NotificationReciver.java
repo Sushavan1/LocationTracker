@@ -4,10 +4,16 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
+import android.support.annotation.NonNull;
 import android.util.Log;
-import android.widget.Toast;
 
+import com.example.loknath.locationtracker.dto.RequestDto;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -23,18 +29,46 @@ import okhttp3.Response;
 
 public class NotificationReciver extends BroadcastReceiver {
     private OkHttpClient mClient = new OkHttpClient();
+    private DatabaseReference mRequested_data;
 
+    private RequestDto requestDto;
+    private String isAccept ;
     @Override
-    public void onReceive(Context context, Intent intent) {
-        String message = intent.getExtras().getString("tostMessage");
-        boolean isAccept = intent.getExtras().getBoolean("isAccept");
-        String mRequestkey = intent.getExtras().getString("mRequestkey");
+    public void onReceive(final Context context, Intent intent) {
+        String message = intent.getStringExtra("toastMessage");
+        final String isAccept = intent.getStringExtra("isAccepted");
+        String mRequestkey = intent.getStringExtra("mRequestkey");
        // Toast.makeText(context,ActiveUser.message,Toast.LENGTH_LONG).show();
-        System.out.println(message+isAccept+"...........mRequestkey"+intent.getExtras().toString());
+        System.out.println(mRequestkey+isAccept+message);
+        mRequested_data = FirebaseDatabase.getInstance().getReference().child("Request").child(mRequestkey);
+
+        mRequested_data.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                requestDto=dataSnapshot.getValue(RequestDto.class);
+               System.out.println("............. "+requestDto.toString());
+                JSONArray jsonArray = new JSONArray();
+                jsonArray.put(requestDto.sender);
+                if(isAccept.equals("Accept")) {
+                    mRequested_data.child("isAccepted").setValue(true);
+                   sendMessage(jsonArray, "Notification Recived", "Now You can Track", "", "Notification Recived MSG",context,true);
+                }else {
+                   sendMessage(jsonArray, "Notification Recived", "Now You can Track", "", "Notification Recived MSG", context,false);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError){
+                System.out.println(databaseError.getCode());
+
+            }
+        });
+
+
     }
 
 
-    public void sendMessage(final JSONArray recipients, final String title, final String body, final String icon, final String message) {
+    public void sendMessage(final JSONArray recipients, final String title, final String body, final String icon, final String message, final Context context, final boolean isAccepted) {
 
         new AsyncTask<String, String, String>() {
 
@@ -51,6 +85,7 @@ public class NotificationReciver extends BroadcastReceiver {
                     JSONObject data = new JSONObject();
                     data.put("uid", FirebaseAuth.getInstance().getCurrentUser().getUid());
                     data.put("message", message);
+                    data.put("isSender", true);
 
                     root.put("notification", notification);
                     root.put("data", data);
@@ -74,6 +109,11 @@ public class NotificationReciver extends BroadcastReceiver {
                     failure = resultJson.getInt("failure");
                 } catch (JSONException e) {
                     e.printStackTrace();
+                }
+                if(isAccepted)
+                {
+                    Intent intent2 = new Intent(context,MapsActivity.class);
+                    context.startActivity(intent2);
                 }
             }
         }.execute();
