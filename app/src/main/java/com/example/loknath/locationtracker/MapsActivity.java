@@ -157,10 +157,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         queryAsSender.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                if(fndLocationMarker!=null)
-                {
-                    fndLocationMarker.remove();
-                }
+
                 ArrayList<RequestDto> myArrayList = new ArrayList<RequestDto>();
                 for (DataSnapshot dataSnapshot1 : dataSnapshot.getChildren()) {
                     RequestDto requestDto;//=new UserDto();
@@ -180,6 +177,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                     userDto = dataSnapshot.getValue(UserDto.class);
 
 
+                                if(fndLocationMarker!=null)
+                                {
+                                    fndLocationMarker.remove();
+                                }
 
                                 LatLng latLng = new LatLng(userDto.location.lat,userDto.location.lan);
 
@@ -203,7 +204,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 UserDto userDto;//=new UserDto();
                                 userDto = dataSnapshot.getValue(UserDto.class);
 
-
+                                if(fndLocationMarker!=null)
+                                {
+                                    fndLocationMarker.remove();
+                                }
 
                                 LatLng latLng = new LatLng(userDto.location.lat,userDto.location.lan);
                                 mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
