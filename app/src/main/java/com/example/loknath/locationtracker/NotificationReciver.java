@@ -13,6 +13,7 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.ValueEventListener;
 
 import org.json.JSONArray;
@@ -29,10 +30,11 @@ import okhttp3.Response;
 
 public class NotificationReciver extends BroadcastReceiver {
     private OkHttpClient mClient = new OkHttpClient();
-    private DatabaseReference mRequested_data;
+    private DatabaseReference senderRequestDb,recivererRequestDb;
 
     private RequestDto requestDto;
     private String isAccept ;
+    private String auth_id;
     @Override
     public void onReceive(final Context context, Intent intent) {
         String message = intent.getStringExtra("toastMessage");
@@ -40,9 +42,15 @@ public class NotificationReciver extends BroadcastReceiver {
         String mRequestkey = intent.getStringExtra("mRequestkey");
        // Toast.makeText(context,ActiveUser.message,Toast.LENGTH_LONG).show();
         System.out.println(mRequestkey+isAccept+message);
-        mRequested_data = FirebaseDatabase.getInstance().getReference().child("Request").child(mRequestkey);
+auth_id=FirebaseAuth.getInstance().getCurrentUser().getUid();
+        senderRequestDb = FirebaseDatabase.getInstance().getReference().child("User").child(mRequestkey).child("Request").child(auth_id);
+        recivererRequestDb = FirebaseDatabase.getInstance().getReference().child("User").child(auth_id).child("Request").child(mRequestkey);
 
-        mRequested_data.addValueEventListener(new ValueEventListener() {
+
+        recivererRequestDb.child("isAccepted").setValue(true);
+        recivererRequestDb.child("timestamp").setValue(ServerValue.TIMESTAMP);
+
+        senderRequestDb.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 requestDto=dataSnapshot.getValue(RequestDto.class);
@@ -50,7 +58,8 @@ public class NotificationReciver extends BroadcastReceiver {
                 JSONArray jsonArray = new JSONArray();
                 jsonArray.put(requestDto.sender);
                 if(isAccept.equals("Accept")) {
-                    mRequested_data.child("isAccepted").setValue(true);
+                    senderRequestDb.child("isAccepted").setValue(true);
+                    senderRequestDb.child("timestamp").setValue(ServerValue.TIMESTAMP);
                    sendMessage(jsonArray, "Notification Recived", "Now You can Track", "", "Notification Recived MSG",context,true);
                 }else {
                    sendMessage(jsonArray, "Notification Recived", "Now You can Track", "", "Notification Recived MSG", context,false);

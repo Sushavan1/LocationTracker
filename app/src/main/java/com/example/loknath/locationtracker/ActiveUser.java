@@ -21,6 +21,7 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
+import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.ValueEventListener;
 
 import org.json.JSONArray;
@@ -44,10 +45,9 @@ public class ActiveUser extends AppCompatActivity {
 
     private RecyclerView recyclerView;
     private ArrayList<UserDto> myArrayList;
-    DatabaseReference mfirebase, mRequest;
+    DatabaseReference mfirebase, senderRequestDb,recivererRequestDb;
     private String authID;
     private OkHttpClient mClient = new OkHttpClient();
-    private String mRequestkey;
     private String name = null;
 
     @Override
@@ -56,13 +56,10 @@ public class ActiveUser extends AppCompatActivity {
         setContentView(R.layout.activity_active_user);
 
         recyclerView = findViewById(R.id.rvUserList);
-        RecyclerView.LayoutManager mLayoutManager = new LinearLayoutManager(getApplicationContext());
-        recyclerView.setLayoutManager(mLayoutManager);
+        recyclerView.setLayoutManager(new LinearLayoutManager(getApplicationContext()));
 
 
         mfirebase = FirebaseDatabase.getInstance().getReference().child("User");
-        mRequest = FirebaseDatabase.getInstance().getReference().child("Request");
-
 
         Query query =  mfirebase.orderByChild("status").equalTo(true);
         query.addValueEventListener(new ValueEventListener() {
@@ -86,14 +83,17 @@ public class ActiveUser extends AppCompatActivity {
                     public void onItemClick(int position) {
                         // Create new post at /user-posts/$userid/$postid and at
                         // /posts/$postid simultaneously
-                        mRequestkey = mRequest.push().getKey();
 
-                        Map<String, Object> childUpdates = new HashMap<>();
-                        childUpdates.put("isAccepted", false);
-                        childUpdates.put("receiver", myArrayList.get(position).key);
-                        childUpdates.put("sender", authID);
+                        senderRequestDb = FirebaseDatabase.getInstance().getReference().child("User").child(authID).child("Request").child(myArrayList.get(position).key);
+                        recivererRequestDb = FirebaseDatabase.getInstance().getReference().child("User").child(myArrayList.get(position).key).child("Request").child(authID);
 
-                        mRequest.child(mRequestkey).updateChildren(childUpdates).addOnSuccessListener(new OnSuccessListener<Void>() {
+                        Map<String, Object> request = new HashMap<>();
+                        request.put("isAccepted", false);
+                        request.put("receiver", myArrayList.get(position).key);
+                        request.put("sender", authID);
+                        request.put("timestamp", ServerValue.TIMESTAMP);
+                        senderRequestDb.updateChildren(request);
+                        recivererRequestDb.updateChildren(request).addOnSuccessListener(new OnSuccessListener<Void>() {
                             @Override
                             public void onSuccess(Void aVoid) {
                                 AlertDialog alertDialog = new AlertDialog.Builder(ActiveUser.this).create();
@@ -123,12 +123,13 @@ public class ActiveUser extends AppCompatActivity {
                             }
                         });
 
-                        JSONArray jsonArray = new JSONArray();
+                        final JSONArray jsonArray = new JSONArray();
                         jsonArray.put(myArrayList.get(position).token);
-                        mfirebase.child(authID).child("Name").addValueEventListener(new ValueEventListener() {
+                        mfirebase.child(authID).addValueEventListener(new ValueEventListener() {
                             @Override
                             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                                name = (String) dataSnapshot.getValue();
+                                name = (String) dataSnapshot.child("Name").getValue();
+                                sendMessage(jsonArray, getString(R.string.app_name), name + " request to track you Location ", "Http:\\google.com", message);
                             }
 
                             @Override
@@ -136,7 +137,6 @@ public class ActiveUser extends AppCompatActivity {
 
                             }
                         });
-                        sendMessage(jsonArray, getString(R.string.app_name), name + " request to track you Location ", "Http:\\google.com", message);
                     }
                 });
 
@@ -172,7 +172,7 @@ public class ActiveUser extends AppCompatActivity {
                     JSONObject data = new JSONObject();
                     data.put("uid", FirebaseAuth.getInstance().getCurrentUser().getUid());
                     data.put("message", message);
-                    data.put("mRequestkey", mRequestkey);
+                    data.put("mRequestkey", authID);
                     data.put("isSender", false);
 
                     root.put("notification", notification);

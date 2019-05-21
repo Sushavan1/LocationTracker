@@ -103,7 +103,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Log.e(MapsActivity.class.getName(),userId);
         userTableReference = FirebaseDatabase.getInstance().getReference().child("User");
         userReferenceStatus = FirebaseDatabase.getInstance().getReference().child("User").child(userId).child("status");
-        requestTable= FirebaseDatabase.getInstance().getReference().child("Request");
+        requestTable= FirebaseDatabase.getInstance().getReference().child("User").child(userId).child("Request");
         userReferenceStatus.setValue(true);
 
 
@@ -152,24 +152,46 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void getFndLocation() {
-        Query queryAsSender =  requestTable.orderByChild("sender").equalTo(userId);
+        Query queryAsSender =  requestTable.orderByChild("isAccepted").equalTo(true);
 
         queryAsSender.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
+                if (currentLocationMarker!=null){
+                    currentLocationMarker.remove();
+                }
 
-                ArrayList<RequestDto> myArrayList = new ArrayList<RequestDto>();
+                userTableReference.child(userId).addValueEventListener(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+
+                        UserDto userDto;//=new UserDto();
+                        userDto = dataSnapshot.getValue(UserDto.class);
+
+                        if(fndLocationMarker!=null)
+                        {
+                            fndLocationMarker.remove();
+                        }
+
+                        LatLng latLng = new LatLng(userDto.location.lat,userDto.location.lan);
+                        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+                        MarkerOptions markerOptions = new MarkerOptions();
+                        markerOptions.position(latLng);
+                        markerOptions.title("My Location" + mLastLocation);
+                        markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
+                        fndLocationMarker = mMap.addMarker(markerOptions);
+                    }
+
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
+
+                    }
+                });
+
                 for (DataSnapshot dataSnapshot1 : dataSnapshot.getChildren()) {
-                    RequestDto requestDto;//=new UserDto();
-                    requestDto = dataSnapshot1.getValue(RequestDto.class);
-
-                    /*UserDto userDto;//=new UserDto();
-                    userDto = dataSnapshot1.getValue(UserDto.class);
-                    userDto.key = dataSnapshot1.getKey().toString();*/
-                    if (requestDto.isAccepted)
-                    {
-
-                        userTableReference.child(requestDto.receiver).addValueEventListener(new ValueEventListener() {
+               //     RequestDto requestDto;//=new UserDto();
+              //      requestDto = dataSnapshot1.getValue(RequestDto.class);
+                    userTableReference.child(dataSnapshot1.getKey()).addValueEventListener(new ValueEventListener() {
                             @Override
                             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
 
@@ -196,37 +218,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                             }
                         });
-
-                        userTableReference.child(userId).addValueEventListener(new ValueEventListener() {
-                            @Override
-                            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-
-                                UserDto userDto;//=new UserDto();
-                                userDto = dataSnapshot.getValue(UserDto.class);
-
-                                if(fndLocationMarker!=null)
-                                {
-                                    fndLocationMarker.remove();
-                                }
-
-                                LatLng latLng = new LatLng(userDto.location.lat,userDto.location.lan);
-                                mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-                                MarkerOptions markerOptions = new MarkerOptions();
-                                markerOptions.position(latLng);
-                                markerOptions.title("My Location" + mLastLocation);
-                                markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
-                                fndLocationMarker = mMap.addMarker(markerOptions);
-                            }
-
-                            @Override
-                            public void onCancelled(@NonNull DatabaseError databaseError) {
-
-                            }
-                        });
-
-                    }
-
                 }
+
 
 
             }
@@ -264,9 +257,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onLocationChanged(Location location) {
         mLastLocation = location;
 
-        if (currentLocationMarker!=null){
-            currentLocationMarker.remove();
-        }
 /*
         LatLng latLng = new LatLng(location.getLatitude(),location.getLongitude());
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
