@@ -4,17 +4,27 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Point;
 import android.location.Location;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.util.Log;
 import android.view.View;
+import android.view.animation.Interpolator;
+import android.view.animation.LinearInterpolator;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.directions.route.AbstractRouting;
+import com.directions.route.Route;
+import com.directions.route.RouteException;
+import com.directions.route.Routing;
+import com.directions.route.RoutingListener;
 import com.example.loknath.locationtracker.adaper.UserAdaper;
 import com.example.loknath.locationtracker.dto.RequestDto;
 import com.example.loknath.locationtracker.dto.UserDto;
@@ -33,11 +43,14 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.Projection;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
@@ -157,29 +170,25 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         queryAsSender.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                if (currentLocationMarker!=null){
-                    currentLocationMarker.remove();
-                }
 
                 userTableReference.child(userId).addValueEventListener(new ValueEventListener() {
                     @Override
                     public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
 
-                        UserDto userDto;//=new UserDto();
-                        userDto = dataSnapshot.getValue(UserDto.class);
-
-                        if(fndLocationMarker!=null)
-                        {
-                            fndLocationMarker.remove();
+                        if (currentLocationMarker!=null){
+                            currentLocationMarker.remove();
                         }
 
+                        UserDto userDto;//=new UserDto();
+                        userDto = dataSnapshot.getValue(UserDto.class);
                         LatLng latLng = new LatLng(userDto.location.lat,userDto.location.lan);
                         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
                         MarkerOptions markerOptions = new MarkerOptions();
                         markerOptions.position(latLng);
                         markerOptions.title("My Location" + mLastLocation);
                         markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
-                        fndLocationMarker = mMap.addMarker(markerOptions);
+                        currentLocationMarker = mMap.addMarker(markerOptions);
+
                     }
 
                     @Override
@@ -188,21 +197,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     }
                 });
 
+
                 for (DataSnapshot dataSnapshot1 : dataSnapshot.getChildren()) {
                //     RequestDto requestDto;//=new UserDto();
               //      requestDto = dataSnapshot1.getValue(RequestDto.class);
                     userTableReference.child(dataSnapshot1.getKey()).addValueEventListener(new ValueEventListener() {
                             @Override
                             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-
+                               /* if (fndLocationMarker!=null){
+                                    fndLocationMarker.remove();
+                                }*/
                                     UserDto userDto;//=new UserDto();
                                     userDto = dataSnapshot.getValue(UserDto.class);
+                                System.out.println(".................. Raja");
 
 
-                                if(fndLocationMarker!=null)
-                                {
-                                    fndLocationMarker.remove();
-                                }
 
                                 LatLng latLng = new LatLng(userDto.location.lat,userDto.location.lan);
 
@@ -211,6 +220,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 markerOptions.title("Friend Location" + mLastLocation);
                                 markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ROSE));
                                 fndLocationMarker = mMap.addMarker(markerOptions);
+
+                                //animateMarker(fndLocationMarker,latLng,false);
+
                             }
 
                             @Override
@@ -219,8 +231,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             }
                         });
                 }
-
-
 
             }
 
@@ -251,6 +261,43 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .addApi(LocationServices.API)
                 .build();
         mgoogleApiClient.connect();
+    }
+
+    public void animateMarker(final Marker marker, final LatLng toPosition,
+                              final boolean hideMarker) {
+        final Handler handler = new Handler();
+        final long start = SystemClock.uptimeMillis();
+        Projection proj = mMap.getProjection();
+        Point startPoint = proj.toScreenLocation(marker.getPosition());
+        final LatLng startLatLng = proj.fromScreenLocation(startPoint);
+        final long duration = 500;
+
+        final Interpolator interpolator = new LinearInterpolator();
+
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                long elapsed = SystemClock.uptimeMillis() - start;
+                float t = interpolator.getInterpolation((float) elapsed
+                        / duration);
+                double lng = t * toPosition.longitude + (1 - t)
+                        * startLatLng.longitude;
+                double lat = t * toPosition.latitude + (1 - t)
+                        * startLatLng.latitude;
+                marker.setPosition(new LatLng(lat, lng));
+
+                if (t < 1.0) {
+                    // Post again 16ms later.
+                    handler.postDelayed(this, 16);
+                } else {
+                    if (hideMarker) {
+                        marker.setVisible(false);
+                    } else {
+                        marker.setVisible(true);
+                    }
+                }
+            }
+        });
     }
 
     @Override
@@ -287,8 +334,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         mLocationRequest = new LocationRequest();
-        mLocationRequest.setInterval(1000);
-        mLocationRequest.setFastestInterval(1000);
+        mLocationRequest.setInterval(1000*30);
+        mLocationRequest.setFastestInterval(1000*30);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
         if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -319,4 +366,5 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         userReferenceStatus.setValue(false);
         super.onDestroy();
     }
+
 }
